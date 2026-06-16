@@ -4253,17 +4253,6 @@ void rejectCommandFormat(client *c, const char *fmt, ...) {
 
 /* This is called after a command in call, we can do some maintenance job in it. */
 void afterCommand(client *c) {
-    /* Fire keyed post-notification jobs between sub-commands, before any
-     * propagation, but only for modules that opted into
-     * REDISMODULE_OPTIONS_PER_KEY_NOTIFICATION_JOBS. The execution_nesting test
-     * leads on purpose: it is a hot field already in cache, and between-sub-command
-     * firing is only meaningful when we are nested inside an outer execution unit
-     * (e.g. a MULTI/EXEC sub-command or a script). A standalone command runs here
-     * with execution_nesting == 0, short-circuits, and never loads the per-key
-     * byte - the remaining jobs drain at the end-of-unit chokepoint below. */
-    if (server.execution_nesting && server.fire_keyed_jobs_between_subcommands)
-        firePerKeyJobsBetweenSubcommands();
-
     /* Should be done before trackingHandlePendingKeyInvalidations so that we
      * reply to client before invalidating cache (makes more sense) */
     postExecutionUnitOperations();

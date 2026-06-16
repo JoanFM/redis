@@ -687,6 +687,16 @@ void scriptCall(scriptRunCtx *run_ctx, sds *err) {
     }
     call(c, call_flags);
     serverAssert((c->flags & CLIENT_BLOCKED) == 0);
+
+    /* Fire per-key post-notification jobs queued by this script command, so
+     * modules that opted into REDISMODULE_OPTIONS_PER_KEY_NOTIFICATION_JOBS
+     * observe per-key effects between commands inside a script (EVAL/FCALL),
+     * mirroring MULTI/EXEC. Done explicitly here, not on the universal
+     * afterCommand() path, so standalone commands pay nothing. The command's
+     * call() has fully returned, so running the callbacks is pointer-safe. */
+    if (server.fire_keyed_jobs_between_subcommands)
+        firePerKeyJobsBetweenSubcommands();
+
     clusterSlotStatsInvalidateSlotIfApplicable(run_ctx);
     return;
 
