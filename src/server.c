@@ -3850,8 +3850,6 @@ void postExecutionUnitOperations(void) {
     if (server.execution_nesting)
         return;
 
-    /* Drains the single post-notification queue: regular jobs, plus any per-key
-     * jobs not already fired between sub-commands. */
     firePostExecutionUnitJobs();
 
     /* If we are at the top-most call() and not inside a an active module

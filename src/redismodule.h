@@ -345,10 +345,7 @@ typedef uint64_t RedisModuleTimerID;
 
 /* Declare that the module's per-key post-notification jobs (registered via
  * RedisModule_AddPostNotificationJobForKey) must fire at the tail of every
- * call() - including between sub-commands inside MULTI/EXEC - rather than only
- * once at the end of the outer execution unit. When unset, keyed jobs fire only
- * at the end of the execution unit (the same point as RedisModule_AddPostNotificationJob),
- * which keeps them entirely off the per-command hot path. */
+ * call() - including between sub-commands inside MULTI/EXEC */
 #define REDISMODULE_OPTIONS_PER_KEY_NOTIFICATION_JOBS    (1<<4)
 
 /* Next option flag, must be updated when adding new module flags above!
