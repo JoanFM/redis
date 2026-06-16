@@ -1766,8 +1766,6 @@ fmterr: /* Format error. */
     /* fall through to cleanup. */
 
 cleanup:
-    /* Flush any post-notification jobs still queued from the replay (e.g. lazy
-     * per-key jobs that don't fire between sub-commands). */
     firePostExecutionUnitJobs();
     if (fakeClient) freeClient(fakeClient);
     server.current_client = old_cur_client;

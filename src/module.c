@@ -9635,8 +9635,6 @@ int RM_AddPostNotificationJobForKey(RedisModuleCtx *ctx, RedisModulePostNotifyJo
       return REDISMODULE_ERR;
     }
 
-    /* Per-key jobs share the regular post-notification queue; the key marks the
-     * job as per-key and is passed to the callback when it runs. */
     RedisModulePostExecUnitJob *job = zmalloc(sizeof(*job));
     job->module = ctx->module;
     job->key_callback = callback;
