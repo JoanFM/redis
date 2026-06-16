@@ -228,14 +228,13 @@ void execCommand(client *c) {
 
             serverAssert((c->flags & CLIENT_BLOCKED) == 0);
 
-            /* Fire per-key post-notification jobs queued by this sub-command, so
-             * modules that opted into REDISMODULE_OPTIONS_PER_KEY_NOTIFICATION_JOBS
-             * observe per-key effects between MULTI/EXEC sub-commands. This is done
-             * explicitly here, rather than on the universal afterCommand() path, so
-             * standalone commands pay nothing. The sub-command's call() has fully
-             * returned, so it is safe to run the callbacks (no use-after-realloc).
-             * Jobs not fired here (e.g. registered by non-opted modules) drain at
-             * the end of the EXEC's execution unit. */
+            /* Fire per-key post-notification jobs (RM_AddPostNotificationJobForKey)
+             * queued by this sub-command, so modules observe per-key effects between
+             * MULTI/EXEC sub-commands. This is done explicitly here, rather than on
+             * the universal afterCommand() path, so standalone commands pay nothing.
+             * The sub-command's call() has fully returned, so it is safe to run the
+             * callbacks (no use-after-realloc). Regular jobs drain at the end of the
+             * EXEC's execution unit. */
             if (server.fire_keyed_jobs_between_subcommands)
                 firePerKeyJobsBetweenSubcommands();
         }

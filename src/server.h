@@ -2066,9 +2066,11 @@ struct redisServer {
                                        * callback runs. The no-write guard: RM_Call is
                                        * refused for the duration so the callback cannot
                                        * touch the keyspace. */
-    uint8_t fire_keyed_jobs_between_subcommands; /* Non-zero when a module that
-                                       * opted into REDISMODULE_OPTIONS_PER_KEY_NOTIFICATION_JOBS
-                                       * queued a keyed job. */
+    uint8_t fire_keyed_jobs_between_subcommands; /* Non-zero when a per-key job
+                                       * (RM_AddPostNotificationJobForKey) is queued.
+                                       * Gates the explicit between-sub-command drains
+                                       * in execCommand (multi.c), scriptCall (script.c),
+                                       * and AOF replay (aof.c). */
     uint8_t in_keyspace_notification;     /* >0 while inside a moduleNotifyKeyspaceEvent
                                        * dispatch. Defines the scope from which
                                        * RM_AddPostNotificationJobForKey may be called;
