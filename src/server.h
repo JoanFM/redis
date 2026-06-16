@@ -2062,20 +2062,6 @@ struct redisServer {
     int execution_nesting;      /* Execution nesting level.
                                  * e.g. call(), async module stuff (timers, events, etc.),
                                  * cron stuff (active expire, eviction) */
-    uint8_t firing_keyed_post_notif_jobs; /* Non-zero while a per-key post-notification
-                                       * callback runs. The no-write guard: RM_Call is
-                                       * refused for the duration so the callback cannot
-                                       * touch the keyspace. */
-    uint8_t fire_keyed_jobs_between_subcommands; /* Non-zero when a module that
-                                       * opted into REDISMODULE_OPTIONS_PER_KEY_NOTIFICATION_JOBS
-                                       * queued a keyed job. Gates the between-sub-command
-                                       * drain in afterCommand; checked only after
-                                       * execution_nesting (hot) so standalone commands
-                                       * never load this byte. */
-    uint8_t in_keyspace_notification;     /* >0 while inside a moduleNotifyKeyspaceEvent
-                                       * dispatch. Defines the scope from which
-                                       * RM_AddPostNotificationJobForKey may be called;
-                                       * a counter so nested notifications nest cleanly. */
     rax *clients_index;         /* Active clients dictionary by client ID. */
     uint32_t paused_actions;   /* Bitmask of actions that are currently paused */
     list *postponed_clients;       /* List of postponed clients */
@@ -3136,6 +3122,10 @@ void moduleReleaseGIL(void);
 void moduleNotifyKeyspaceEvent(int type, const char *event, robj *key, int dbid, robj **subkeys, int count);
 void firePostExecutionUnitJobs(void);
 void firePerKeyJobsBetweenSubcommands(void);
+/* Module-subsystem global (defined in module.c), kept out of struct redisServer
+ * so the per-key feature does not perturb the hot struct layout. Non-zero when an
+ * opted-in per-key job is queued; gates the between-sub-command drain in afterCommand. */
+extern int fire_keyed_jobs_between_subcommands;
 void moduleCallCommandFilters(client *c);
 void modulePostExecutionUnitOperations(void);
 void ModuleForkDoneHandler(int exitcode, int bysignal);
