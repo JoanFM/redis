@@ -369,25 +369,6 @@ static list *modulePostExecUnitJobs;
 
 static int keyedPostNotifRMCallWarned = 0;
 
-/* Per-key post-notification state. Kept here at module file scope (rather than in
- * struct redisServer) so the feature does not change the hot struct layout. */
-
-/* Non-zero while a per-key post-notification callback runs: the no-write guard,
- * so RM_Call is refused for the duration and the callback cannot touch the keyspace. */
-static int firing_keyed_post_notif_jobs = 0;
-
-/* Non-zero when a module that opted into REDISMODULE_OPTIONS_PER_KEY_NOTIFICATION_JOBS
- * has a keyed job queued. Read on the hot path in afterCommand (server.c) and during
- * AOF replay (aof.c), so it is a plain global declared extern in server.h; the
- * afterCommand check is gated behind execution_nesting first so standalone commands
- * never load it. */
-int fire_keyed_jobs_between_subcommands = 0;
-
-/* >0 while inside a moduleNotifyKeyspaceEvent dispatch. Defines the scope from which
- * RM_AddPostNotificationJobForKey may be called; a counter so nested notifications
- * nest cleanly. */
-static int in_keyspace_notification = 0;
-
 /* Data structures related to the exported dictionary data structure. */
 typedef struct RedisModuleDict {
     rax *rax;                       /* The radix tree. */
@@ -6954,7 +6935,7 @@ RedisModuleCallReply *RM_Call(RedisModuleCtx *ctx, const char *cmdname, const ch
     /* Enforce the per-key post-notification contract: a per-key callback
      * (registered via RM_AddPostNotificationJobForKey) MUST NOT issue
      * commands. */
-    if (firing_keyed_post_notif_jobs) {
+    if (server.firing_keyed_post_notif_jobs) {
         /* Calling a command from within a per-key post-notification callback is
          * a misuse of the API. */
         if (!keyedPostNotifRMCallWarned) {
@@ -9502,9 +9483,9 @@ static void executePostExecUnitJob(RedisModulePostExecUnitJob *job) {
     selectDb(ctx.client, job->dbid);
 
     if (job->key) {
-        firing_keyed_post_notif_jobs = 1;
+        server.firing_keyed_post_notif_jobs = 1;
         job->key_callback(&ctx, job->key, job->pd);
-        firing_keyed_post_notif_jobs = 0;
+        server.firing_keyed_post_notif_jobs = 0;
         decrRefCount(job->key);
     } else {
         job->callback(&ctx, job->pd);
@@ -9557,7 +9538,7 @@ __attribute__((noinline,cold)) void firePerKeyJobsBetweenSubcommands(void) {
         ln = next;
     }
     exitExecutionUnit();
-    fire_keyed_jobs_between_subcommands = 0;
+    server.fire_keyed_jobs_between_subcommands = 0;
 }
 
 /* When running inside a key space notification callback, it is dangerous and highly discouraged to perform any write
@@ -9637,7 +9618,7 @@ int RM_AddPostNotificationJobForKey(RedisModuleCtx *ctx, RedisModulePostNotifyJo
 
     /* The API is only meaningful from inside a keyspace-notification handler:
      * that is the single-key context the per-key contract is scoped to. */
-    if (!in_keyspace_notification) {
+    if (!server.in_keyspace_notification) {
         serverLog(LL_WARNING,
             "API misuse detected in module %s: "
             "RedisModule_AddPostNotificationJobForKey called outside a "
@@ -9670,7 +9651,7 @@ int RM_AddPostNotificationJobForKey(RedisModuleCtx *ctx, RedisModulePostNotifyJo
         (ctx->module->options & REDISMODULE_OPTIONS_PER_KEY_NOTIFICATION_JOBS) ? 1 : 0;
     listAddNodeTail(modulePostExecUnitJobs, job);
     if (job->fire_between_subcommands)
-        fire_keyed_jobs_between_subcommands = 1;
+        server.fire_keyed_jobs_between_subcommands = 1;
     return REDISMODULE_OK;
 }
 
@@ -9734,7 +9715,7 @@ void moduleNotifyKeyspaceEvent(int type, const char *event, robj *key, int dbid,
     enterExecutionUnit(0, 0);
 
     /* Mark that we are inside a keyspace-notification dispatch. */
-    in_keyspace_notification++;
+    server.in_keyspace_notification++;
 
     listIter li;
     listNode *ln;
@@ -9783,7 +9764,7 @@ void moduleNotifyKeyspaceEvent(int type, const char *event, robj *key, int dbid,
         }
     }
 
-    in_keyspace_notification--;
+    server.in_keyspace_notification--;
     exitExecutionUnit();
 }
 
